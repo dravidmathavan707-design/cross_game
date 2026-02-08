@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NEO_CROSSWORDS_GAME — Full</title>
+<style>
+/* ================= PROMATE NEON THEME ================= */
+:root{
+  --bg1:#06142f; --bg2:#0a1b3c; --bg3:#09274d; --bg4:#0f1f45;
+  --panel:rgba(10,27,60,0.8); --card:#14233a; --accent:#4da3ff; --muted:#9ec7ff;
+}
+body{
+  margin:0; font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  color:#eaf6ff;
+  background: linear-gradient(-45deg, var(--bg1), var(--bg2), var(--bg3), var(--bg4));
+  background-size: 350% 350%;
+  animation: promateWave 18s ease infinite;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+@keyframes promateWave {
+  0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}
+}
+
+/* page layout */
+.page {
+  max-width:1200px; margin:18px auto; padding:12px; display:flex; flex-direction:column; gap:12px;
+}
+.header { text-align:center; }
+.title { font-size:34px; color:#79bfff; text-shadow:0 0 16px rgba(77,163,255,0.22); letter-spacing:4px; }
+.topbar { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+
+/* buttons */
+.btn {
+  border-radius:10px; padding:8px 12px; border:1px solid rgba(77,163,255,0.12);
+  background:transparent; color:var(--muted); cursor:pointer; margin:4px;
+}
+.btn.active { background: rgba(77,163,255,0.07); box-shadow:0 0 10px rgba(77,163,255,0.06); }
+.btn-primary { background:#10395f; border-color:var(--accent); color:#eaf6ff; }
+.btn-primary:hover { background:#1e5fa5; box-shadow:0 0 12px rgba(77,163,255,0.18); transition:0.25s; }
+
+/* main two-column layout */
+.main { display:flex; gap:18px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+.grid-pane { width:580px; background:var(--panel); padding:18px; border-radius:14px; border:1px solid rgba(77,163,255,0.06);
+  box-shadow:0 6px 30px rgba(0,0,0,0.45); animation: promatePulse 6s ease-in-out infinite; }
+@keyframes promatePulse {
+  0%{box-shadow:0 0 18px rgba(77,163,255,0.06);}50%{box-shadow:0 0 40px rgba(77,163,255,0.16);}100%{box-shadow:0 0 18px rgba(77,163,255,0.06);}
+}
+.controls { display:flex; gap:8px; justify-content:center; margin:12px 0; flex-wrap:wrap; }
+.status { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+.badge { background:rgba(77,163,255,0.06); padding:6px 8px; border-radius:10px; color:#cfe8ff; border:1px solid rgba(77,163,255,0.04); }
+
+/* grid */
+.grid { display:grid; gap:6px; justify-content:start; }
+.cell { width:46px; height:46px; background:var(--card); border-radius:10px; position:relative; box-shadow:0 0 8px rgba(27,58,99,0.22); }
+.cell.black { background:#000; box-shadow:none; }
+.cell input { width:100%; height:100%; border:0; background:transparent; text-align:center; font-size:22px; color:#fff; outline:none; text-transform:uppercase; }
+.num { position:absolute; left:4px; top:2px; font-size:11px; color:#9bcaff; }
+
+/* sidebar */
+.sidebar { width:420px; background:var(--panel); padding:18px; border-radius:14px; border:1px solid rgba(77,163,255,0.06); box-shadow:0 6px 30px rgba(0,0,0,0.4); }
+.clues { max-height:420px; overflow:auto; padding-right:6px; }
+.clue { padding:8px; border-radius:8px; color:#cfe6ff; cursor:pointer; margin-bottom:6px;}
+.clue:hover { color:var(--accent); box-shadow: inset 0 0 12px rgba(77,163,255,0.03); }
+
+/* keyboard */
+.keyboard { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.key { width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:#0f233a; border-radius:8px; border:1px solid rgba(77,163,255,0.06); color:#eaf6ff; cursor:pointer; }
+
+/* confetti canvas overlay */
+#confetti { position:fixed; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:9999; }
+
+/* responsive */
+@media(max-width:1050px){ .main{flex-direction:column; align-items:center;} .sidebar{width:92%} .grid-pane{width:92%} }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="title">NEO_CROSSWORDS_GAME</div>
+    <div class="topbar" id="modeRow">
+      <button class="btn active" data-mode="easy">Easy</button>
+      <button class="btn" data-mode="medium">Medium</button>
+      <button class="btn" data-mode="hard">Hard</button>
+      <span style="width:10px"></span>
+      <button class="btn active" data-level="1">Level 1 (4×4)</button>
+      <button class="btn" data-level="2">Level 2 (5×5)</button>
+      <button class="btn" data-level="3">Level 3 (10×10)</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="grid-pane">
+      <div id="grid" class="grid" aria-label="crossword-grid"></div>
+
+      <div class="controls">
+        <button id="submitBtn" class="btn btn-primary">Submit</button>
+        <button id="hintBtn" class="btn">Hint</button>
+        <button id="restartBtn" class="btn">Restart</button>
+      </div>
+
+      <div class="status">
+        <div class="badge">Mode: <span id="modeLabel">Easy</span></div>
+        <div class="badge">Lives: <span id="lives">3</span></div>
+        <div class="badge">Time: <span id="timer">00:00</span></div>
+        <div class="badge" id="remainBadge" style="display:none">Remain: <span id="remain">00:00</span></div>
+        <div class="badge">Leaderboard: <button id="showLeaderboard" class="btn" style="padding:6px 8px">Open</button></div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-weight:700; color:#bfe4ff">Across</div>
+        <div style="display:flex; gap:6px">
+          <button id="checkBtn" class="btn">Check</button>
+          <button id="revealBtn" class="btn">Reveal</button>
+          <button id="clearBtn" class="btn">Clear</button>
+        </div>
+      </div>
+
+      <div id="across" class="clues" style="margin-top:8px"></div>
+      <div style="height:6px"></div>
+      <div style="font-weight:700; color:#bfe4ff">Down</div>
+      <div id="down" class="clues" style="margin-top:8px"></div>
+
+      <div style="margin-top:12px; font-weight:700; color:#bfe4ff">Keyboard</div>
+      <div id="keyboard" class="keyboard"></div>
+
+      <div style="margin-top:12px">
+        <div class="badge">Best time (this mode+level): <span id="bestTime">—</span></div>
+        <div style="margin-top:8px; color:#9fbfff; font-size:13px">Finish a level to save best time locally (stored in your browser).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- confetti canvas -->
+<canvas id="confetti"></canvas>
+
+<!-- ============== SCRIPT ============== -->
+<script>
+/* ================= NOTES / FUTURE (commented)
+   You can later add:
+   - Daily Challenge: new puzzle per day
+   - Online leaderboard: requires backend API
+   - Sound/music toggle & volume control
+   - Custom puzzle import/export
+   - Arrow-key navigation & improved focus handling
+   - Haptic feedback (mobile)
+   These are listed for later development.
+*/
+
+/* =========== Sound effects (WebAudio simple) =========== */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function beep(freq=400, type='sine', duration=0.08, vol=0.05){
+  try{
+    if(!audioCtx) audioCtx = new AudioCtx();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); setTimeout(()=>{ o.stop(); }, duration*1000);
+  }catch(e){ /* ignore on old browsers */ }
+}
+function playWrong(){ beep(180,'sine',0.12,0.06); }
+function playClick(){ beep(800,'triangle',0.04,0.02); }
+function playWin(){ beep(880,'sine',0.2,0.08); setTimeout(()=>beep(1200,'sine',0.18,0.06),150); }
+
+/* =========== Confetti (simple canvas) =========== */
+const confettiCanvas = document.getElementById('confetti');
+const ctx = confettiCanvas.getContext('2d');
+let confettiPieces = [];
+function resizeCanvas(){ confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight; }
+resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+
+function spawnConfetti(){
+  confettiPieces = [];
+  for(let i=0;i<120;i++){
+    confettiPieces.push({
+      x: Math.random()*confettiCanvas.width,
+      y: Math.random()*-confettiCanvas.height,
+      r: 6+Math.random()*8,
+      d: Math.random()*40+10,
+      vx: (Math.random()-0.5)*2,
+      vy: 1+Math.random()*3,
+      color: ["#4da3ff","#7fe0ff","#a8e8ff","#6fc2ff"][Math.floor(Math.random()*4)],
+      rot: Math.random()*360,
+      vr: (Math.random()-0.5)*6
+    });
+  }
+  playWin();
+  animateConfetti();
+  setTimeout(()=>{ confettiPieces = []; }, 3500);
+}
+let confettiAnimId = null;
+function animateConfetti(){
+  cancelAnimationFrame(confettiAnimId);
+  function frame(){
+    ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    confettiPieces.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot * Math.PI/180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r*0.6);
+      ctx.restore();
+    });
+    confettiAnimId = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+/* =========== Puzzle Data (matching lengths) =========== */
+/* Use '.' for black cells; solution rows match grid row lengths exactly */
+const LEVELS = {
+  1: {
+    size:4,
+    grid:["CAT.","A..E",".TEA",".NOW"],
+    solution:["CAT.","A..E",".TEA",".NOW"],
+    across:{1:"Common pet (3)",2:"Single letter/article (1)",3:"Hot drink (3)",4:"Time word (3)"},
+    down:{1:"First letter (1)",2:"Not OR (2)",3:"Sound a dog makes (3)"},
+    circles:["0,0","0,2"]
+  },
+  2: {
+    size:5,
+    grid:["APPLE","PIZZA","LEMON","LIGHT","CRANE"],
+    solution:["APPLE","PIZZA","LEMON","LIGHT","CRANE"],
+    across:{1:"A fruit (5)",6:"Italian flatbread (5)",11:"Sour fruit (5)",16:"Opposite of heavy (5)",21:"Bird or machine (5)"},
+    down:{1:"A fruit (5)"},
+    circles:["0,0","2,2"]
+  },
+  3: {
+    size:10,
+    grid:[
+      "SMARTPHONE",
+      "MICROSCOPE",
+      "LIGHTHOUSE",
+      "HEADPHONES",
+      "NOTEBOOKPC",
+      "TELEPHONES",
+      "BACKPACKER",
+      "POWERPLUGS",
+      "MONITORING",
+      "INTERACTOR"
+    ],
+    solution:[
+      "SMARTPHONE",
+      "MICROSCOPE",
+      "LIGHTHOUSE",
+      "HEADPHONES",
+      "NOTEBOOKPC",
+      "TELEPHONES",
+      "BACKPACKER",
+      "POWERPLUGS",
+      "MONITORING",
+      "INTERACTOR"
+    ],
+    across:{
+      1:"A handheld smart device (10)",
+      11:"Optical instrument to see tiny things (10)",
+      21:"Tower with a light (10)",
+      31:"Audio output worn on ears (10)",
+      41:"Portable personal computer (10)",
+      51:"Multiple phones (10)",
+      61:"Traveler's bag (10)",
+      71:"Electrical connector parts (10)",
+      81:"Watching or observing continuously (10)",
+      91:"One who interacts (10)"
+    },
+    down:{},
+    circles:["0,0","2,2","4,4","6,6","8,8"]
+  }
+};
+
+/* =========== State and UI refs =========== */
+let currentLevel = 1;
+let currentMode = 'easy'; // easy medium hard
+let lives = 3;
+let seconds = 0;
+let timerInterval = null;
+let countdownRemain = 0;
+let countdownInterval = null;
+let currentPuzzle = null;
+let numbers = {}; // numbering map
+
+const gridEl = document.getElementById('grid');
+const acrossEl = document.getElementById('across');
+const downEl = document.getElementById('down');
+const keyboardEl = document.getElementById('keyboard');
+const modeLabel = document.getElementById('modeLabel');
+const livesEl = document.getElementById('lives');
+const timerEl = document.getElementById('timer');
+const remainBadge = document.getElementById('remainBadge') || document.getElementById('remainBadge');
+const remainEl = document.getElementById('remain');
+const bestTimeEl = document.getElementById('bestTime');
+
+/* helper: format time */
+function formatTime(s){ const mm = Math.floor(s/60).toString().padStart(2,'0'); const ss = (s%60).toString().padStart(2,'0'); return `${mm}:${ss}`; }
+
+/* compute clue numbering */
+function computeNumbers(grid){
+  numbers = {}; let n=1;
+  for(let r=0;r<grid.length;r++){
+    for(let c=0;c<grid[0].length;c++){
+      if((grid[r][c]||'.') === '.') continue;
+      const startAcross = (c===0 || (grid[r][c-1]||'.') === '.');
+      const startDown = (r===0 || (grid[r-1][c]||'.') === '.');
+      if(startAcross || startDown) numbers[`${r},${c}`] = n++;
+    }
+  }
+}
+
+/* =========== Build DOM grid =========== */
+function buildGrid(levelId){
+  stopTimer(); clearCountdown(); seconds = 0; timerEl.innerText = formatTime(0);
+  countdownRemain = 0; document.getElementById('remainBadge').style.display = 'none';
+
+  currentLevel = levelId;
+  currentPuzzle = LEVELS[levelId];
+  computeNumbers(currentPuzzle.grid);
+  lives = 3; livesEl.innerText = lives;
+  gridEl.innerHTML = '';
+
+  const cols = currentPuzzle.grid[0].length;
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, 46px)`;
+
+  for(let r=0;r<currentPuzzle.grid.length;r++){
+    for(let c=0;c<cols;c++){
+      const pos = `${r},${c}`;
+      const ch = (currentPuzzle.grid[r][c]||'.');
+      const cell = document.createElement('div');
+      cell.className = 'cell'; cell.dataset.pos = pos;
+      if(ch === '.'){
+        cell.classList.add('black');
+      } else {
+        if(numbers[pos]){
+          const n = document.createElement('div'); n.className = 'num'; n.innerText = numbers[pos];
+          cell.appendChild(n);
+        }
+        const inp = document.createElement('input');
+        inp.maxLength = 1; inp.dataset.r = r; inp.dataset.c = c;
+        inp.addEventListener('input', onInput);
+        inp.addEventListener('focus', ()=> currentInput = inp);
+        inp.addEventListener('touchstart', (ev)=> { ev.target.focus(); }, {passive:true});
+        cell.appendChild(inp);
+        if(currentPuzzle.circles && currentPuzzle.circles.includes(pos)) cell.classList.add('circle');
+      }
+      gridEl.appendChild(cell);
+    }
+  }
+
+  loadClues();
+  loadKeyboard();
+  loadProgress();
+  startTimer();
+
+  if(currentMode === 'medium'){
+    if(levelId===1) countdownRemain = 60;
+    else if(levelId===2) countdownRemain = 180;
+    else countdownRemain = 420;
+    document.getElementById('remainBadge').style.display = 'inline-block';
+    remainEl.innerText = formatTime(countdownRemain);
+    startCountdown();
+  }
+  updateBestUI();
+}
+
+/* input behavior */
+function onInput(e){
+  const inp = e.target;
+  inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g,'');
+  playClick();
+  // auto-advance right
+  const r = +inp.dataset.r, c = +inp.dataset.c;
+  let nc = c+1;
+  while(nc < currentPuzzle.grid[0].length){
+    const nxt = document.querySelector(`input[data-r='${r}'][data-c='${nc}']`);
+    if(nxt){ nxt.focus(); break; } nc++;
+  }
+  saveProgress();
+}
+
+/* load clues */
+function loadClues(){
+  acrossEl.innerHTML = ''; downEl.innerHTML = '';
+  const a = currentPuzzle.across || {}, d = currentPuzzle.down || {};
+  Object.entries(a).forEach(([k,txt])=>{
+    const el = document.createElement('div'); el.className='clue'; el.innerText = `${k}. ${txt}`;
+    el.onclick = ()=> { highlightClue(parseInt(k),'A'); playClick(); };
+    acrossEl.appendChild(el);
+  });
+  Object.entries(d).forEach(([k,txt])=>{
+    const el = document.createElement('div'); el.className='clue'; el.innerText = `${k}. ${txt}`;
+    el.onclick = ()=> { highlightClue(parseInt(k),'D'); playClick(); };
+    downEl.appendChild(el);
+  });
+}
+
+/* highlight a clue */
+function highlightClue(num, dir){
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('highlight'));
+  for(const pos in numbers){
+    if(numbers[pos] === num){
+      let [r,c] = pos.split(',').map(Number);
+      if(dir === 'A'){
+        while(c < currentPuzzle.grid[0].length && (currentPuzzle.grid[r][c]||'.') !== '.'){
+          document.querySelector(`[data-pos='${r},${c}']`).classList.add('highlight'); c++;
+        }
+      } else {
+        while(r < currentPuzzle.grid.length && (currentPuzzle.grid[r][c]||'.') !== '.'){
+          document.querySelector(`[data-pos='${r},${c}']`).classList.add('highlight'); r++;
+        }
+      }
+      break;
+    }
+  }
+}
+
+/* keyboard */
+function loadKeyboard(){
+  keyboardEl.innerHTML = '';
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').forEach(ch=>{
+    const k = document.createElement('div'); k.className='key'; k.innerText=ch;
+    k.onclick = ()=> {
+      const a = document.activeElement;
+      if(a && a.tagName === 'INPUT'){ a.value = ch; a.dispatchEvent(new Event('input')); a.focus(); saveProgress(); playClick(); }
+    };
+    keyboardEl.appendChild(k);
+  });
+}
+
+/* submit logic */
+function submitLevel(){
+  const sol = currentPuzzle.solution || [];
+  let wrong = 0;
+  for(let r=0;r<currentPuzzle.grid.length;r++){
+    for(let c=0;c<currentPuzzle.grid[0].length;c++){
+      if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+      const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+      const got = (inp.value || '').toUpperCase();
+      const want = (sol[r]||'')[c] || '';
+      if(!got || !want || got !== want.toUpperCase()){
+        wrong++; inp.style.background = '#4d1a1a';
+      } else { inp.style.background = '#1b3a27'; }
+    }
+  }
+  if(wrong === 0){
+    stopTimer(); spawnConfetti(); saveBestIfBetter(seconds); playWin();
+    showEndDialog(formatTime(seconds));
+    return;
+  } else {
+    lives--; livesEl.innerText = lives; saveProgress();
+    playWrong();
+    if(lives <= 0){
+      stopTimer(); alert('No lives left — restarting level'); buildGrid(currentLevel);
+    } else {
+      alert(`Submission had ${wrong} wrong/empty cells. You lost a life.`);
+    }
+  }
+}
+
+/* show end-of-level dialog with options: Next / Replay / Previous */
+function showEndDialog(timeStr){
+  // remove any existing dialog
+  const existing = document.getElementById('endDialog'); if(existing) existing.remove();
+
+  const overlay = document.createElement('div'); overlay.id = 'endDialog';
+  overlay.style.position = 'fixed'; overlay.style.left = 0; overlay.style.top = 0; overlay.style.right = 0; overlay.style.bottom = 0;
+  overlay.style.display = 'flex'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center';
+  overlay.style.background = 'rgba(2,6,15,0.6)'; overlay.style.zIndex = 10000; overlay.style.backdropFilter = 'blur(4px)';
+
+  const card = document.createElement('div');
+  card.style.background = 'linear-gradient(180deg, rgba(20,35,58,0.98), rgba(10,20,40,0.98))';
+  card.style.border = '1px solid rgba(77,163,255,0.12)'; card.style.padding = '18px'; card.style.borderRadius = '12px';
+  card.style.width = '360px'; card.style.color = '#eaf6ff'; card.style.textAlign = 'center'; card.style.boxShadow = '0 8px 40px rgba(0,0,0,0.6)';
+
+  const title = document.createElement('div'); title.style.fontSize = '20px'; title.style.fontWeight = 800; title.style.marginBottom = '8px';
+  title.innerText = 'Congratulations!';
+  const msg = document.createElement('div'); msg.style.marginBottom = '12px'; msg.innerText = `Level cleared — Time: ${timeStr}`;
+
+  const btnRow = document.createElement('div'); btnRow.style.display = 'flex'; btnRow.style.justifyContent = 'center'; btnRow.style.gap = '10px';
+
+  const prevBtn = document.createElement('button'); prevBtn.className = 'btn'; prevBtn.innerText = 'Previous';
+  const replayBtn = document.createElement('button'); replayBtn.className = 'btn btn-primary'; replayBtn.innerText = 'Replay';
+  const nextBtn = document.createElement('button'); nextBtn.className = 'btn'; nextBtn.innerText = 'Next';
+
+  // button actions
+  prevBtn.onclick = ()=>{
+    overlay.remove();
+    if(currentLevel > 1){
+      const newLevel = currentLevel - 1;
+      document.querySelectorAll('[data-level]').forEach(b=>b.classList.remove('active'));
+      const btn = document.querySelector(`[data-level='${newLevel}']`); if(btn) btn.classList.add('active');
+      // clear any saved progress for that level+mode so the grid starts empty
+      clearSavedProgress(newLevel, currentMode);
+      buildGrid(newLevel); // buildGrid clears entries and resets state
+    } else {
+      alert('This is the first level.');
+    }
+  };
+
+  replayBtn.onclick = ()=>{
+    overlay.remove();
+    // replay same level: rebuild to clear written words and reset state
+    document.querySelectorAll('[data-level]').forEach(b=>b.classList.remove('active'));
+    const btn = document.querySelector(`[data-level='${currentLevel}']`); if(btn) btn.classList.add('active');
+    // clear saved progress for the current level+mode, then rebuild so entries are empty
+    clearSavedProgress(currentLevel, currentMode);
+    buildGrid(currentLevel);
+  };
+
+  nextBtn.onclick = ()=>{
+    overlay.remove();
+    if(currentLevel < 3){
+      const newLevel = currentLevel + 1;
+      document.querySelectorAll('[data-level]').forEach(b=>b.classList.remove('active'));
+      const btn = document.querySelector(`[data-level='${newLevel}']`); if(btn) btn.classList.add('active');
+      buildGrid(newLevel);
+    } else {
+      alert('You completed all levels — well done!');
+    }
+  };
+
+  btnRow.appendChild(prevBtn); btnRow.appendChild(replayBtn); btnRow.appendChild(nextBtn);
+  card.appendChild(title); card.appendChild(msg); card.appendChild(btnRow);
+  overlay.appendChild(card); document.body.appendChild(overlay);
+}
+
+/* check/reveal/clear/hint */
+function checkAnswers(){
+  const sol = currentPuzzle.solution || [];
+  for(let r=0;r<currentPuzzle.grid.length;r++){
+    for(let c=0;c<currentPuzzle.grid[0].length;c++){
+      if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+      const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+      const want = (sol[r]||'')[c] || '';
+      if(inp.value && want && inp.value.toUpperCase() === want.toUpperCase()){
+        inp.style.background = '#1b3a27';
+      } else {
+        inp.style.background = '#4d1a1a';
+      }
+    }
+  }
+}
+function revealAll(){
+  const sol = currentPuzzle.solution || [];
+  for(let r=0;r<currentPuzzle.grid.length;r++){
+    for(let c=0;c<currentPuzzle.grid[0].length;c++){
+      if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+      const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+      const want = (sol[r]||'')[c] || '';
+      inp.value = want === '.' ? '' : want; inp.style.background = '#1b3a27';
+    }
+  }
+  saveProgress();
+}
+function clearGrid(){
+  document.querySelectorAll('input').forEach(i=>{ i.value=''; i.style.background='transparent'; });
+  saveProgress();
+}
+function hintAction(){
+  if(currentMode === 'medium'){ alert('No hints in Medium mode.'); return; }
+  const sol = currentPuzzle.solution || [];
+  for(let r=0;r<currentPuzzle.grid.length;r++){
+    for(let c=0;c<currentPuzzle.grid[0].length;c++){
+      if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+      const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+      const want = (sol[r]||'')[c] || '';
+      if(!inp.value || inp.value.toUpperCase() !== want.toUpperCase()){
+        inp.value = want; inp.style.background = '#1b3a27'; saveProgress(); playClick();
+        if(currentMode === 'hard'){ lives--; livesEl.innerText = lives; if(lives<=0){ alert('Used last life for hint — level failed'); buildGrid(currentLevel); } else alert('Hint used (Hard): 1 life deducted.'); }
+        else alert('Hint used (Easy).');
+        return;
+      }
+    }
+  }
+  alert('No hint needed.');
+}
+
+/* =========== Timer & Countdown =========== */
+function startTimer(){ stopTimer(); timerInterval = setInterval(()=>{ seconds++; timerEl.innerText = formatTime(seconds); }, 1000); }
+function stopTimer(){ if(timerInterval) clearInterval(timerInterval); timerInterval = null; }
+function startCountdown(){
+  if(countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(()=>{
+    countdownRemain--; remainEl.innerText = formatTime(countdownRemain);
+    if(countdownRemain<=0){ clearInterval(countdownInterval); stopTimer(); alert('Time up! Level failed.'); buildGrid(currentLevel); }
+  },1000);
+}
+function clearCountdown(){ if(countdownInterval) clearInterval(countdownInterval); countdownInterval=null; }
+
+/* =========== Save / Load Progress & Best times (localStorage) =========== */
+function keyForProgress(){ return `neo_cross_L${currentLevel}_M${currentMode}`; }
+function saveProgress(){
+  try{
+    const key = keyForProgress();
+    const rows = currentPuzzle.grid.length, cols = currentPuzzle.grid[0].length;
+    const arr = [];
+    for(let r=0;r<rows;r++){
+      let s=''; for(let c=0;c<cols;c++){
+        if((currentPuzzle.grid[r][c]||'.') === '.') s += '.';
+        else s += (document.querySelector(`input[data-r='${r}'][data-c='${c}']`)||{}).value || ' ';
+      } arr.push(s);
+    }
+    localStorage.setItem(key, JSON.stringify(arr));
+    localStorage.setItem('lives_'+key, lives);
+    localStorage.setItem('time_'+key, seconds);
+  }catch(e){ console.warn(e); }
+}
+
+/* remove saved progress for a specific level+mode */
+function clearSavedProgress(level, mode){
+  try{
+    const key = `neo_cross_L${level}_M${mode}`;
+    localStorage.removeItem(key);
+    localStorage.removeItem('lives_'+key);
+    localStorage.removeItem('time_'+key);
+  }catch(e){ console.warn(e); }
+}
+function loadProgress(){
+  try{
+    const key = keyForProgress();
+    const raw = localStorage.getItem(key); if(raw){
+      const arr = JSON.parse(raw);
+      for(let r=0;r<arr.length;r++){
+        for(let c=0;c<arr[r].length;c++){
+          if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+          const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+          if(inp) inp.value = arr[r][c] === ' ' ? '' : arr[r][c];
+        }
+      }
+    }
+    const savedLives = localStorage.getItem('lives_'+key);
+    if(savedLives){ lives = +savedLives; livesEl.innerText = lives; }
+    const savedTime = localStorage.getItem('time_'+key);
+    if(savedTime){ seconds = +savedTime; timerEl.innerText = formatTime(seconds); }
+  }catch(e){ console.warn(e); }
+}
+function loadProgress(){ loadProgressLocal(); }
+function loadProgressLocal(){
+  try{
+    const key = keyForProgress();
+    const raw = localStorage.getItem(key); if(!raw) return;
+    const arr = JSON.parse(raw);
+    for(let r=0;r<arr.length;r++){
+      for(let c=0;c<arr[r].length;c++){
+        if((currentPuzzle.grid[r][c]||'.') === '.') continue;
+        const inp = document.querySelector(`input[data-r='${r}'][data-c='${c}']`);
+        if(inp) inp.value = arr[r][c] === ' ' ? '' : arr[r][c];
+      }
+    }
+  }catch(e){ console.warn(e); }
+}
+
+/* best time storage / leaderboard per (level+mode) */
+function bestKey(){ return `neo_best_L${currentLevel}_M${currentMode}`; }
+function saveBestIfBetter(t){
+  const key = bestKey(); const cur = localStorage.getItem(key);
+  if(!cur || t < +cur) localStorage.setItem(key, t);
+  updateBestUI();
+}
+function updateBestUI(){ const v = localStorage.getItem(bestKey()); bestTimeEl.innerText = v ? formatTime(+v) : '—'; }
+
+/* leaderboard modal (simple local list) */
+function showLeaderboard(){
+  const store = [];
+  for(let lvl=1; lvl<=3; lvl++){
+    ['easy','medium','hard'].forEach(mode=>{
+      const k = `neo_best_L${lvl}_M${mode}`;
+      const v = localStorage.getItem(k);
+      if(v) store.push({level:lvl, mode:mode, time:+v});
+    });
+  }
+  store.sort((a,b)=>a.time-b.time);
+  let text = "Local Leaderboard (best times):\n\n";
+  store.slice(0,10).forEach((s,i)=> text += `${i+1}. L${s.level} ${s.mode} — ${formatTime(s.time)}\n`);
+  if(store.length===0) text = "No scores saved yet. Finish levels to save best times.";
+  alert(text);
+}
+
+/* =========== UI bindings =========== */
+document.getElementById('submitBtn').addEventListener('click', ()=>{ submitLevel(); });
+document.getElementById('hintBtn').addEventListener('click', ()=>{ hintAction(); });
+document.getElementById('restartBtn').addEventListener('click', ()=>{ 
+  if(confirm('Restart level?')){
+    // clear any saved progress for current level+mode so restart truly clears answers
+    clearSavedProgress(currentLevel, currentMode);
+    buildGrid(currentLevel);
+  }
+});
+document.getElementById('checkBtn').addEventListener('click', ()=>{ checkAnswers(); });
+document.getElementById('revealBtn').addEventListener('click', ()=>{ if(confirm('Reveal full solution?')) revealAll(); });
+document.getElementById('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all entries?')) clearGrid(); });
+document.getElementById('showLeaderboard').addEventListener('click', ()=>{ showLeaderboard(); });
+
+/* mode & level buttons */
+document.querySelectorAll('[data-mode]').forEach(b=>{
+  b.addEventListener('click', (ev)=>{
+    document.querySelectorAll('[data-mode]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); currentMode = b.dataset.mode; modeLabel.innerText = b.innerText;
+    buildGrid(currentLevel);
+  });
+});
+document.querySelectorAll('[data-level]').forEach(b=>{
+  b.addEventListener('click', (ev)=>{
+    document.querySelectorAll('[data-level]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); const lvl = +b.dataset.level;
+    buildGrid(lvl);
+  });
+});
+
+/* auto-save on exit */
+window.addEventListener('beforeunload', ()=> saveProgress());
+
+/* =========== Start game =========== */
+function loadProgress(){ loadProgressLocal(); } // ensure definition exists
+function updateBestUI(){ const v = localStorage.getItem(bestKey()); bestTimeEl.innerText = v ? formatTime(+v) : '—'; }
+
+buildGrid(1);
+updateBestUI();
+
+/* =========== confetti trigger example on win is spawnConfetti() =========== */
+
+</script>
+</body>
+</html>
